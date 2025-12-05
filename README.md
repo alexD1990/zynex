@@ -1,2 +1,9 @@
-# DCheck
-Spark-native data validation library for quality checks, profiling, and compliance — quick insights in your notebook
+# DCheck - Data Quality Validator for Spark
+
+## Overview
+DCheck is a data validation tool for Spark DataFrames. It helps ensure that your data meets the necessary quality standards by applying multiple checks like:
+
+- Duplicate rows detection
+- Null ratio check
+- Outliers detection (using IQR)
+- Small file detection
