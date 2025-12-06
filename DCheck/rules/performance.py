@@ -1,32 +1,55 @@
 from DCheck.rules.base import Rule
 from DCheck.core.report import RuleResult
 
+
 class SmallFileRule(Rule):
     name = "small_files"
 
-    def apply(self, df):
-        input_files = df.inputFiles()
-        num_files = len(input_files)
+    def __init__(self, table_name=None, min_avg_mb=64):
+        self.table_name = table_name
+        self.min_avg_mb = min_avg_mb
 
-        if num_files == 0:
+    def apply(self, df):
+        if not self.table_name:
             return RuleResult(
                 name=self.name,
                 status="ok",
-                metrics={"num_files": 0.0, "avg_file_size_mb": 0.0},
-                message="No input files detected"
+                metrics={
+                    "num_files": 0.0,
+                    "avg_file_size_mb": 0.0,
+                },
+                message="Small file check skipped (no table name provided)",
             )
 
-        total_bytes = sum([df.sparkSession._jvm.org.apache.hadoop.fs.FileSystem.get(df.sparkSession._jsc.hadoopConfiguration())
-                           .getFileStatus(df.sparkSession._jvm.org.apache.hadoop.fs.Path(f)).getLen() for f in input_files])
-        avg_file_size_mb = (total_bytes / num_files) / (1024 * 1024)
+        detail = df.sparkSession.sql(
+            f"DESCRIBE DETAIL {self.table_name}"
+        ).collect()[0]
 
-        status = "warning" if avg_file_size_mb < 64 else "ok"
-        message = "Small file problem detected" if status == "warning" else "No small file problem detected"
+        num_files = detail["numFiles"]
+        total_bytes = detail["sizeInBytes"]
+
+        if num_files == 0:
+            avg_file_size_mb = 0.0
+        else:
+            avg_file_size_mb = (total_bytes / num_files) / (1024 * 1024)
+
+        if avg_file_size_mb < 16:
+            status = "warning"
+            message = "Severe small file problem detected"
+        elif avg_file_size_mb < self.min_avg_mb:
+            status = "warning"
+            message = "Small file problem detected"
+        else:
+            status = "ok"
+            message = "No small file problem detected"
 
         return RuleResult(
             name=self.name,
             status=status,
-            metrics={"num_files": float(num_files), "avg_file_size_mb": float(avg_file_size_mb)},
+            metrics={
+                "num_files": float(num_files),
+                "avg_file_size_mb": float(avg_file_size_mb),
+            },
             message=message,
         )
 

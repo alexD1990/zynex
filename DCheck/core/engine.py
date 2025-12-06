@@ -3,21 +3,22 @@ from DCheck.rules.quality import NullRatioRule
 from DCheck.rules.performance import SmallFileRule, IqrOutlierRule
 from DCheck.core.report import ValidationReport
 
-RULES = [
-    DuplicateRowRule(),
-    NullRatioRule(),
-    IqrOutlierRule(),
-    SmallFileRule(),
-]
 
-def run_engine(df):
+def run_engine(df, table_name=None):
+    rules = [
+        DuplicateRowRule(),
+        NullRatioRule(),
+        IqrOutlierRule(),
+        SmallFileRule(table_name=table_name),
+    ]
+
     report = ValidationReport(
         rows=df.count(),
         columns=len(df.columns),
         column_names=df.columns,
     )
 
-    for rule in RULES:
+    for rule in rules:
         result = rule.apply(df)
         report.results.append(result)
 
