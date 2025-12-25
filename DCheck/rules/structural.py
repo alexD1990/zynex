@@ -10,7 +10,7 @@ class DuplicateRowRule(Rule):
         duplicate_rows = total_rows - unique_rows
 
         status = "warning" if duplicate_rows > 0 else "ok"
-        message = "Duplicate rows detected" if duplicate_rows > 0 else "No duplicate rows"
+        message = "Duplicate full rows detected" if duplicate_rows > 0 else "No duplicate full rows"
 
         return RuleResult(
             name=self.name,
