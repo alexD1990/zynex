@@ -1,19 +1,27 @@
+from __future__ import annotations
+
+from typing import Optional, Dict, Any
+from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
+
 from DCheck.rules.base import Rule
 from DCheck.core.report import RuleResult
-from pyspark.sql import functions as F
+
 
 class SkewnessRule(Rule):
     """
-    Rask sjekk av numerisk fordeling.
-    Beregner min, max, avg og stddev i én operasjon.
-    Varsler hvis maks/min verdi er ekstremt langt unna snittet (default > 5 stddevs).
+    Fast statistical analysis of numeric distributions.
+    
+    Computes min, max, avg, and stddev for all numeric columns in a single Spark job.
+    Flags columns where values deviate significantly from the mean (Outlier detection via Z-Score).
     """
     name = "extreme_values"
 
-    def __init__(self, threshold_stddev=5.0):
+    def __init__(self, threshold_stddev: float = 5.0):
         self.threshold = threshold_stddev
 
-    def apply(self, df, context=None):
+    def apply(self, df: DataFrame, context: Optional[Dict[str, Any]] = None) -> RuleResult:
+        # Identify numeric columns
         numeric_cols = [c for c, t in df.dtypes if t in ("int", "bigint", "double", "float")]
 
         if not numeric_cols:
@@ -24,8 +32,9 @@ class SkewnessRule(Rule):
                 message="No numeric columns to check.",
             )
 
-        # Bygg én stor aggregering for alle kolonner samtidig
-        # Dette er mye raskere enn approxQuantile i loop
+        # Optimization: Construct a single large aggregation expression.
+        # This avoids launching separate Spark jobs per column, which is significantly faster 
+        # than looping or using approxQuantile.
         exprs = []
         for c in numeric_cols:
             exprs.extend([
@@ -35,7 +44,7 @@ class SkewnessRule(Rule):
                 F.stddev(c).alias(f"{c}_std")
             ])
 
-        # Kjører 1 jobb for hele tabellen
+        # Execute 1 job for the entire table
         row = df.agg(*exprs).collect()[0].asDict()
 
         flagged_columns = {}
@@ -47,11 +56,11 @@ class SkewnessRule(Rule):
             c_avg = row[f"{c}_avg"] or 0
             c_std = row[f"{c}_std"] or 0
 
-            # Unngå deling på null hvis flat data
+            # Avoid division by zero (e.g., constant values where stddev is 0)
             if c_std == 0:
                 continue
 
-            # Sjekk din logikk: Er max/min langt unna?
+            # Calculate Z-Scores (Distance from mean)
             z_max = (c_max - c_avg) / c_std
             z_min = (c_avg - c_min) / c_std
 
@@ -61,7 +70,7 @@ class SkewnessRule(Rule):
                     "max": float(c_max),
                     "avg": float(c_avg),
                     "std": float(c_std),
-                    "max_sigma": float(round(max(z_max, z_min), 1)) # Hvor mange ganger stddev
+                    "max_sigma": float(round(max(z_max, z_min), 1))  # Magnitude of deviation
                 }
                 total_extreme_cols += 1
 

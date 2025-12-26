@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from typing import Optional, Dict, Any
 
 from DCheck.rules.base import Rule
 from DCheck.core.report import RuleResult
@@ -8,17 +9,18 @@ from DCheck.core.report import RuleResult
 
 class SmallFileRule(Rule):
     """
-    Checks Delta table file layout using DESCRIBE DETAIL and flags potentially inefficient
-    file density (many files relative to total table size).
+    Analyzes Delta table metadata via 'DESCRIBE DETAIL' to identify file fragmentation.
+    Flags inefficiencies based on file count relative to total dataset size.
 
-    This rule is advisory only. It does not stop execution or run optimization commands.
+    Note: This is a metadata-only check and does not scan actual data rows.
     """
     name = "small_files"
 
     def __init__(self, table_name: str | None = None):
         self.table_name = table_name
 
-    def apply(self, df, context=None) -> RuleResult:
+    def apply(self, df, context: Optional[Dict[str, Any]] = None) -> RuleResult:
+        # 1. Skip if no table context is provided
         if not self.table_name:
             return RuleResult(
                 name=self.name,
@@ -28,101 +30,79 @@ class SmallFileRule(Rule):
                     "total_size_gb": 0.0,
                     "avg_file_size_mb": 0.0,
                     "files_per_gb": 0.0,
-                    "rating": "optimal",
-                    "recommendation": "Skipped (no table_name provided).",
+                    "rating": "skipped",
+                    "recommendation": "None",
                 },
-                message="Small file check skipped (no table_name provided).",
+                message="Skipped: Table name not provided for metadata check.",
             )
 
-        # Accept formats:
-        #   schema.table
-        #   catalog.schema.table
-        # This is a minimal guardrail to avoid unexpected SQL inputs.
+        # 2. Input validation (SQL Injection guardrail)
+        # Accepts: schema.table OR catalog.schema.table
         if not re.fullmatch(r"[A-Za-z0-9_]+(\.[A-Za-z0-9_]+){1,2}", self.table_name):
             return RuleResult(
                 name=self.name,
                 status="error",
-                metrics={
-                    "num_files": 0.0,
-                    "total_size_gb": 0.0,
-                    "avg_file_size_mb": 0.0,
-                    "files_per_gb": 0.0,
-                    "rating": "invalid_input",
-                    "recommendation": "Provide table_name as schema.table or catalog.schema.table.",
-                },
-                message="Invalid table_name format for DESCRIBE DETAIL.",
+                metrics={},
+                message="Error: Invalid table name format. Expected 'schema.table' or 'catalog.schema.table'.",
             )
 
+        # 3. Fetch Metadata
         try:
             detail = df.sparkSession.sql(f"DESCRIBE DETAIL {self.table_name}").collect()[0]
         except Exception as e:
             return RuleResult(
                 name=self.name,
                 status="warning",
-                metrics={
-                    "num_files": 0.0,
-                    "total_size_gb": 0.0,
-                    "avg_file_size_mb": 0.0,
-                    "files_per_gb": 0.0,
-                    "rating": "unknown",
-                    "recommendation": "Verify the table exists, is a Delta table, and that you have permissions.",
-                },
-                message=f"Small file check could not read table metadata: {type(e).__name__}",
+                metrics={},
+                message=f"Metadata fetch failed: {type(e).__name__}. Ensure table exists and is Delta format.",
             )
 
+        # 4. Calculate Metrics
         num_files = int(detail["numFiles"])
         total_bytes = int(detail["sizeInBytes"])
 
         total_size_gb = (float(total_bytes) / (1024 ** 3)) if total_bytes else 0.0
         total_size_mb = (float(total_bytes) / (1024 ** 2)) if total_bytes else 0.0
-        avg_file_size_mb = (
-            (float(total_bytes) / float(num_files) / (1024 ** 2)) if num_files else 0.0
-        )
+        
+        avg_file_size_mb = 0.0
+        if num_files > 0:
+            avg_file_size_mb = (float(total_bytes) / float(num_files)) / (1024 ** 2)
 
-        # File density is the primary signal: files per GB of data.
-        # Use a small epsilon to avoid division by zero for tiny tables.
+        # Metric: Files per GB (High density indicates fragmentation)
         eps = 1e-9
         files_per_gb = (float(num_files) / max(total_size_gb, eps)) if num_files else 0.0
 
-        # Heuristic rating (no config yet).
-        # For very small datasets, file density is not a meaningful indicator of operational cost.
+        # 5. Evaluate Health (Heuristics)
+        # Small datasets (<256MB) are excluded from strict density checks.
         if total_size_mb < 256:
             rating = "not_applicable"
+            status = "ok"
+            message = "Dataset is too small for file density analysis."
+            recommendation = "No action required."
+            files_per_gb = 0.0 # Reset for clarity in reports
+        
         elif num_files <= 100:
             rating = "optimal"
+            status = "ok"
+            message = "File density is optimal."
+            recommendation = "No action required."
+
         elif files_per_gb > 2000 and num_files > 500:
             rating = "high_risk"
+            status = "warning" # Can be escalated to 'error' if strict
+            message = "Critical fragmentation detected (High file-to-size ratio)."
+            recommendation = "Action: Run OPTIMIZE immediately to reduce query planning overhead."
+
         elif files_per_gb > 200 or num_files > 1000 or avg_file_size_mb < 16:
             rating = "suboptimal"
+            status = "warning"
+            message = "File density is suboptimal; average file size is low."
+            recommendation = "Action: Monitor query performance. Consider OPTIMIZE if latency increases."
+
         else:
             rating = "optimal"
-
-        status = "warning" if rating in ("suboptimal", "high_risk") else "ok"
-
-        if rating == "not_applicable":
-            message = "Dataset is small; file density is not a meaningful performance indicator at this scale."
-            recommendation = "No action required."
-            # Avoid confusing ratios for tiny datasets
-            files_per_gb = 0.0
-        elif rating == "high_risk":
-            message = (
-                "Small file density is high relative to dataset size. "
-                "This commonly increases planning overhead and slows full scans."
-            )
-            recommendation = (
-                "Consider compaction or OPTIMIZE to reduce the number of files "
-                "before running heavy analytical workloads."
-            )
-        elif rating == "suboptimal":
-            message = (
-                "Small file density is higher than recommended. "
-                "This may reduce performance and compute efficiency."
-            )
-            recommendation = (
-                "Consider compaction or OPTIMIZE if you observe slow reads or excessive task counts."
-            )
-        else:
-            message = "Small file density is within a healthy range."
+            status = "ok"
+            message = "File layout is healthy."
             recommendation = "No action required."
 
         return RuleResult(

@@ -30,18 +30,59 @@ class ValidationReport:
             "errors": sum(r.status == "error" for r in self.results),
         }
 
-def render_report(report: ValidationReport, show_summary: bool = True):
-    print("=" * 60)
-    print("DCHECK REPORT")
-    print(f"Rows    : {report.rows}")
-    print(f"Columns : {report.columns}")
-    print(f"Rules   : {len(report.results)}")
-    print("=" * 60)
-    print()
+# ANSI color codes for terminal/Databricks output
+class Colors:
+    HEADER = '\033[95m'
+    BLUE = '\033[94m'
+    CYAN = '\033[96m'
+    GREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
+def render_report(report: ValidationReport, verbose: bool = False):
+    """
+    Renders a CLI-friendly validation report with ANSI color coding and structured layout.
+    """
+    
+    # --- HELPER: DRAW BOX (Style 2A - Status embedded in Border) ---
+    def print_box(rule_name, status, lines, width=80):
+        # Determine color and label based on status
+        if status == "error":
+            c = Colors.FAIL
+            lbl = "[ERROR]"
+        elif status == "warning":
+            c = Colors.WARNING
+            lbl = "[WARNING]"
+        else:
+            c = Colors.GREEN
+            lbl = "[OK]"
+        
+        # Header construction: ┌── [STATUS] rule_name ──...──┐
+        header_text = f" {lbl} {rule_name} "
+        dash_len = width - len(header_text) - 3 # 3 accounts for '┌──'
+        if dash_len < 0: dash_len = 0
+        
+        # Print top border
+        print(f"{c}┌──{Colors.BOLD}{header_text}{Colors.ENDC}{c}{'─' * dash_len}┐{Colors.ENDC}")
+        
+        # Print content lines
+        for line in lines:
+            print(f"{c}│{Colors.ENDC}  {line}")
+
+        # Print bottom border
+        print(f"{c}└{'─' * (width)}┘{Colors.ENDC}")
+        print()
+    # ------------------------------------------------------
+
+    # 1. SUMMARY HEADER
     status_count = {"ok": 0, "warning": 0, "error": 0}
-    total_cells = report.rows * report.columns
-
+    for r in report.results:
+        s = (r.status or "").lower()
+        if s in status_count: status_count[s] += 1
+    
     def fmt(n, decimals=0):
         try:
             if isinstance(n, float):
@@ -51,122 +92,86 @@ def render_report(report: ValidationReport, show_summary: bool = True):
         except Exception:
             return n
 
-    # Render preflight first (small_files), then the rest.
+    err_str = f"{Colors.FAIL}{status_count['error']} Errors{Colors.ENDC}" if status_count['error'] > 0 else "0 Errors"
+    warn_str = f"{Colors.WARNING}{status_count['warning']} Warnings{Colors.ENDC}" if status_count['warning'] > 0 else "0 Warnings"
+    ok_str = f"{Colors.GREEN}{status_count['ok']} OK{Colors.ENDC}"
+
+    print()
+    print(f"{Colors.BOLD}DCHECK REPORT{Colors.ENDC}")
+    # UPDATED LINE: Added 'x {report.columns} columns'
+    print(f"Dataset: {fmt(report.rows)} rows x {report.columns} columns | {err_str} | {warn_str} | {ok_str}")
+    print()
+
+    # Sort: Run pre-flight checks (small_files) first
     results = list(report.results)
     preflight = [r for r in results if r.name == "small_files"]
     others = [r for r in results if r.name != "small_files"]
     ordered = preflight + others
 
-    def print_preflight_banner_if_needed(r: RuleResult):
-        metrics = r.metrics or {}
-        rating = metrics.get("rating")
-
-        if rating == "high_risk":
-            print("PRE-FLIGHT NOTICE: Small file density is high risk")
-            print(
-                "A high number of files relative to dataset size typically increases planning overhead, "
-                "task scheduling costs, and slows full-table scans."
-            )
-            rec = metrics.get("recommendation")
-            if rec:
-                print(f"Suggested action: {rec}")
-            print()
-
     for result in ordered:
         status = (result.status or "").lower()
-        if status not in status_count:
-            status_count[status] = 0
-        status_count[status] += 1
-
-        print(f"[RULE] {result.name}")
-        print(f"Status : {result.status}")
-        print(f"Message: {result.message}")
-        print()
-
         metrics = result.metrics or {}
+        
+        # UX: Collapse 'OK' results to a single line unless verbose mode is active
+        if status == "ok" and not verbose:
+            print(f"{Colors.GREEN}[OK] {result.name}{Colors.ENDC}")
+            continue
 
-        # --------------------------------------------------
-        # DUPLICATE FULL ROWS — percent of dataset rows
-        # --------------------------------------------------
+        # Build content lines for the details box
+        lines = []
+        lines.append(f"{Colors.BOLD}Message:{Colors.ENDC} {result.message}")
+        lines.append("") # Spacer line
+
+        # --- RULE SPECIFIC FORMATTING ---
+
+        # 1. DUPLICATE ROWS
         if result.name == "duplicate_rows":
-            total_rows = report.rows
             dup = metrics.get("duplicate_rows", 0)
-            uniq = metrics.get("unique_rows", 0)
+            dup_pct = round((dup / report.rows) * 100, 3) if report.rows else 0
+            lines.append(f"• Duplicates : {fmt(dup)} rows ({fmt(dup_pct, 2)}%)")
 
-            dup_pct = round((dup / total_rows) * 100, 3) if total_rows else 0
-            uniq_pct = round((uniq / total_rows) * 100, 3) if total_rows else 0
+        # 2. NULL RATIO
+        elif result.name == "null_ratio":
+            total_val = metrics.get("total_nulls", 0)
+            pct = round((total_val / (report.rows * report.columns)) * 100, 2)
+            lines.append(f"• Total Nulls : {fmt(total_val)} ({fmt(pct, 2)}%)")
+            
+            per_col = metrics.get("per_column", {})
+            if per_col:
+                lines.append(f"• Columns with nulls:")
+                for c, v in per_col.items():
+                    val = v.get("nulls", 0)
+                    cpct = round((val/report.rows)*100, 2)
+                    lines.append(f"    - {c.ljust(15)} : {fmt(val)} ({cpct}%)")
 
-            print("Total metrics:")
-            print(f"  - unique_rows    : {fmt(uniq)} ({fmt(uniq_pct, 2)}%)")
-            print(f"  - duplicate_rows : {fmt(dup)} ({fmt(dup_pct, 2)}%)")
+        # 3. EXTREME VALUES (SKEWNESS)
+        elif result.name == "extreme_values":
+            flagged = metrics.get("flagged_columns", {})
+            if flagged:
+                lines.append(f"• Extreme deviations (>5 stddev):")
+                for c, s in flagged.items():
+                    sigma = s.get("max_sigma", 0)
+                    lines.append(f"    - {Colors.BOLD}{c}{Colors.ENDC} ({sigma}x sigma)")
+                    lines.append(f"      Range : {fmt(s.get('min'))} ... {fmt(s.get('max'))}")
+                    lines.append(f"      Avg   : {fmt(s.get('avg'))} (std: {fmt(s.get('std'))})")
+                    lines.append("") # Spacer
 
-        # --------------------------------------------------
-        # NULL + IQR — total % of all cells; per-column % of rows
-        # --------------------------------------------------
-        elif result.name in ("null_ratio", "iqr_outliers"):
-            total_key = "total_nulls" if result.name == "null_ratio" else "total_outliers"
-            total_val = metrics.get(total_key, 0)
-            pct = round((total_val / total_cells) * 100, 4) if total_cells else 0
-
-            print("Total metrics:")
-            print(f"  - {total_key} : {fmt(total_val)} ({fmt(pct, 2)}% of all values)")
-
-            per_column = metrics.get("per_column")
-            if isinstance(per_column, dict) and per_column:
-                print()
-                print("Per column:")
-                for col, col_metrics in per_column.items():
-                    val = col_metrics.get("nulls") or col_metrics.get("outliers", 0)
-                    col_pct = round((val / report.rows) * 100, 4) if report.rows else 0
-                    print(f"  - {col} : {fmt(val)} ({fmt(col_pct, 2)}% of rows)")
-
-        # --------------------------------------------------
-        # SMALL FILES — dataset-level only
-        # --------------------------------------------------
+        # 4. SMALL FILES
         elif result.name == "small_files":
-            print_preflight_banner_if_needed(result)
-            print("Total metrics:")
+            rating = metrics.get("rating", "unknown").upper()
+            lines.append(f"• Rating       : {rating}")
+            lines.append(f"• Avg File Size: {fmt(metrics.get('avg_file_size_mb',0), 2)} MB")
+            
+            rec = metrics.get("recommendation")
+            if rec and rating != "OPTIMAL":
+                lines.append("")
+                lines.append(f"Recommendation: {rec}")
 
-            key_order = [
-                "rating",
-                "num_files",
-                "total_size_gb",
-                "avg_file_size_mb",
-                "files_per_gb",
-                "recommendation",
-            ]
-            for k in key_order:
-                if k in metrics:
-                    v = metrics[k]
-                    if isinstance(v, (int, float)):
-                        print(f"  - {k} : {fmt(v, 6)}")
-                    else:
-                        print(f"  - {k} : {v}")
-
-            for key, value in metrics.items():
-                if key in key_order or key == "per_column":
-                    continue
-                print(f"  - {key} : {fmt(value, 6)}")
-
-        # --------------------------------------------------
-        # FALLBACK — future rules
-        # --------------------------------------------------
+        # 5. FALLBACK (Generic rules)
         else:
-            print("Total metrics:")
-            for key, value in metrics.items():
-                if key != "per_column":
-                    print(f"  - {key} : {fmt(value, 6)}")
+            for k, v in metrics.items():
+                if k != "per_column": 
+                    lines.append(f"• {k}: {v}")
 
-        print()
-        print("-" * 60)
-        print()
-
-    if show_summary:
-        print("=" * 60)
-        print(
-            f"Summary: "
-            f"ok={fmt(status_count['ok'])} | "
-            f"warning={fmt(status_count['warning'])} | "
-            f"error={fmt(status_count['error'])}"
-        )
-        print("=" * 60)
+        # Render the box
+        print_box(result.name, status, lines)
