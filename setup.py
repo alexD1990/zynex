@@ -4,10 +4,9 @@ setup(
     name="dcheck",
     version="0.1.0",
     packages=find_packages(),
-    install_requires=[
-        "pyspark>=3.1",
-    ],
-    tests_require=[
-        "pytest>=6.0",
-    ],
+    install_requires=[],
+    extras_require={
+        "local": ["pyspark>=3.1"],
+        "dev": ["pytest>=6.0"],
+    },
 )
