@@ -1,4 +1,3 @@
-# DCheck/core/report.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -36,19 +35,13 @@ class ValidationReport:
         }
 
     def __repr__(self) -> str:
-        """
-        Concise summary for notebook display (Databricks/Jupyter).
-        Avoids huge dataclass dumps.
-        """
         s = self.summary()
         return f"<ValidationReport: {s['rows']} rows | {s['errors']} Errors | {s['warnings']} Warnings>"
 
     def __str__(self) -> str:
-        # Make print(report) equally concise
         return self.__repr__()
 
 
-# ANSI color codes for terminal/Databricks output
 class Colors:
     HEADER = "\033[95m"
     BLUE = "\033[94m"
@@ -64,19 +57,14 @@ class Colors:
 def render_report(report: ValidationReport, verbose: bool = False, print_header: bool = True) -> None:
     """
     Renders a CLI-friendly validation report with ANSI color coding and structured layout.
-
-    Args:
-        report: The ValidationReport object.
-        verbose: If True, prints details even for passed (OK) rules.
-        print_header: If False, suppresses the top summary table (used for pre-flight checks).
     """
 
-    # --- HELPER: DRAW BOX (Style 2A - Status embedded in Border) ---
     def print_box(rule_name: str, status: str, lines: List[str], width: int = 80) -> None:
-        if status == "error":
+        status_l = (status or "").lower()
+        if status_l == "error":
             c = Colors.FAIL
             lbl = "[ERROR]"
-        elif status == "warning":
+        elif status_l == "warning":
             c = Colors.WARNING
             lbl = "[WARNING]"
         else:
@@ -84,23 +72,21 @@ def render_report(report: ValidationReport, verbose: bool = False, print_header:
             lbl = "[OK]"
 
         header_text = f" {lbl} {rule_name} "
-        dash_len = width - len(header_text) - 3  # 3 accounts for '┌──'
+        dash_len = width - len(header_text) - 3
         if dash_len < 0:
             dash_len = 0
 
-        # Top border
         print(f"{c}┌──{Colors.BOLD}{header_text}{Colors.ENDC}{c}{'─' * dash_len}┐{Colors.ENDC}")
-
-        # Content
         for line in lines:
             print(f"{c}│{Colors.ENDC}  {line}")
-
-        # Bottom border (kept as in your existing style)
-        print(f"{c}└{'─' * (width)}┘{Colors.ENDC}")
+        print(f"{c}└{'─' * width}┘{Colors.ENDC}")
         print()
 
-    # ✅ ALWAYS available, even when print_header=False
     def fmt(n: Any, decimals: int = 0) -> Any:
+        if n is None:
+            return "-"
+        if isinstance(n, bool):
+            return str(n)
         try:
             if isinstance(n, float):
                 return f"{n:,.{decimals}f}".replace(",", " ")
@@ -116,16 +102,8 @@ def render_report(report: ValidationReport, verbose: bool = False, print_header:
             if s in status_count:
                 status_count[s] += 1
 
-        err_str = (
-            f"{Colors.FAIL}{status_count['error']} Errors{Colors.ENDC}"
-            if status_count["error"] > 0
-            else "0 Errors"
-        )
-        warn_str = (
-            f"{Colors.WARNING}{status_count['warning']} Warnings{Colors.ENDC}"
-            if status_count["warning"] > 0
-            else "0 Warnings"
-        )
+        err_str = f"{Colors.FAIL}{status_count['error']} Errors{Colors.ENDC}" if status_count["error"] > 0 else "0 Errors"
+        warn_str = f"{Colors.WARNING}{status_count['warning']} Warnings{Colors.ENDC}" if status_count["warning"] > 0 else "0 Warnings"
         ok_str = f"{Colors.GREEN}{status_count['ok']} OK{Colors.ENDC}"
 
         print()
@@ -139,7 +117,6 @@ def render_report(report: ValidationReport, verbose: bool = False, print_header:
     others = [r for r in results if r.name != "small_files"]
     ordered = preflight + others
 
-    # 3) RENDER RESULTS
     for result in ordered:
         status = (result.status or "").lower()
         metrics = result.metrics or {}
@@ -153,13 +130,11 @@ def render_report(report: ValidationReport, verbose: bool = False, print_header:
         lines.append(f"{Colors.BOLD}Message:{Colors.ENDC} {result.message}")
         lines.append("")
 
-        # DUPLICATE ROWS
         if result.name == "duplicate_rows":
             dup = metrics.get("duplicate_rows", 0)
             dup_pct = round((dup / report.rows) * 100, 3) if report.rows else 0
             lines.append(f"• Duplicates : {fmt(dup)} rows ({fmt(dup_pct, 2)}%)")
 
-        # NULL RATIO
         elif result.name == "null_ratio":
             total_val = metrics.get("total_nulls", 0)
             denom = (report.rows * report.columns) if (report.rows and report.columns) else 0
@@ -174,7 +149,6 @@ def render_report(report: ValidationReport, verbose: bool = False, print_header:
                     cpct = round((val / report.rows) * 100, 2) if report.rows else 0
                     lines.append(f"    - {c.ljust(15)} : {fmt(val)} ({cpct}%)")
 
-        # EXTREME VALUES (SKEWNESS)
         elif result.name == "extreme_values":
             flagged = metrics.get("flagged_columns", {})
             if flagged:
@@ -186,15 +160,26 @@ def render_report(report: ValidationReport, verbose: bool = False, print_header:
                     lines.append(f"      Avg   : {fmt(s.get('avg'))} (std: {fmt(s.get('std'))})")
                     lines.append("")
 
-        # SMALL FILES (add num_files + total_size as requested)
         elif result.name == "small_files":
             rating = (metrics.get("rating", "unknown") or "unknown").upper()
+            target = metrics.get("target")
+            reason = metrics.get("reason")
 
             num_files = metrics.get("num_files")
             total_size_gb = metrics.get("total_size_gb")
             avg_mb = metrics.get("avg_file_size_mb", 0)
 
             lines.append(f"• Rating       : {rating}")
+
+            #  point 2: show context when metadata fails / target is wrong
+            if target:
+                lines.append(f"• Target       : {target}")
+            if reason:
+                lines.append(f"• Reason       : {str(reason).upper()}")
+
+            #  point 1: avoid fake "0 MB" when not applicable and we have no real size metrics
+            is_na = rating == "NOT_APPLICABLE"
+            has_any_size_metric = (num_files is not None) or (total_size_gb is not None)
 
             if num_files is not None:
                 lines.append(f"• Num Files    : {fmt(num_files)}")
@@ -209,14 +194,14 @@ def render_report(report: ValidationReport, verbose: bool = False, print_header:
                 except Exception:
                     lines.append(f"• Total Size   : {total_size_gb}")
 
-            lines.append(f"• Avg File Size: {fmt(avg_mb, 2)} MB")
+            if not (is_na and not has_any_size_metric):
+                lines.append(f"• Avg File Size: {fmt(avg_mb, 2)} MB")
 
             rec = metrics.get("recommendation")
-            if rec and rating != "OPTIMAL":
+            if rec:
                 lines.append("")
                 lines.append(f"Recommendation: {rec}")
 
-        # FALLBACK (Generic)
         else:
             for k, v in metrics.items():
                 if k != "per_column":

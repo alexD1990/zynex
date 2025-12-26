@@ -26,14 +26,12 @@ class SmallFileRule(Rule):
                 name=self.name,
                 status="ok",
                 metrics={
-                    "num_files": 0.0,
-                    "total_size_gb": 0.0,
-                    "avg_file_size_mb": 0.0,
-                    "files_per_gb": 0.0,
-                    "rating": "skipped",
-                    "recommendation": "None",
+                    "rating": "not_applicable",
+                    "reason": "no_table_name",
+                    "target": "<not provided>",
+                    "recommendation": "Provide table_name/path to enable metadata-based file checks.",
                 },
-                message="Skipped: Table name not provided for metadata check.",
+                message="No table_name/path provided. Cannot run file density analysis.",
             )
 
         # 2. Input validation (SQL Injection guardrail)
@@ -42,19 +40,30 @@ class SmallFileRule(Rule):
             return RuleResult(
                 name=self.name,
                 status="error",
-                metrics={},
-                message="Error: Invalid table name format. Expected 'schema.table' or 'catalog.schema.table'.",
+                metrics={
+                    "rating": "unknown",
+                    "reason": "invalid_table_name",
+                    "target": self.table_name,
+                    "recommendation": "Use 'schema.table' or 'catalog.schema.table'.",
+                },
+                message="Invalid table name format. Expected 'schema.table' or 'catalog.schema.table'.",
             )
 
         # 3. Fetch Metadata
         try:
             detail = df.sparkSession.sql(f"DESCRIBE DETAIL {self.table_name}").collect()[0]
         except Exception as e:
+            # ✅ Minimal fix for point 1-2: not applicable, include target/reason/recommendation, no fake 0 values
             return RuleResult(
                 name=self.name,
-                status="warning",
-                metrics={},
-                message=f"Metadata fetch failed: {type(e).__name__}. Ensure table exists and is Delta format.",
+                status="ok",
+                metrics={
+                    "rating": "not_applicable",
+                    "reason": "metadata_fetch_failed",
+                    "target": self.table_name,
+                    "recommendation": "Verify table exists and is Delta (try: DESCRIBE DETAIL <table>).",
+                },
+                message=f"Metadata fetch failed for '{self.table_name}' ({type(e).__name__}). Cannot run file density analysis.",
             )
 
         # 4. Calculate Metrics
@@ -63,7 +72,7 @@ class SmallFileRule(Rule):
 
         total_size_gb = (float(total_bytes) / (1024 ** 3)) if total_bytes else 0.0
         total_size_mb = (float(total_bytes) / (1024 ** 2)) if total_bytes else 0.0
-        
+
         avg_file_size_mb = 0.0
         if num_files > 0:
             avg_file_size_mb = (float(total_bytes) / float(num_files)) / (1024 ** 2)
@@ -79,8 +88,8 @@ class SmallFileRule(Rule):
             status = "ok"
             message = "Dataset is too small for file density analysis."
             recommendation = "No action required."
-            files_per_gb = 0.0 # Reset for clarity in reports
-        
+            files_per_gb = 0.0  # Reset for clarity in reports
+
         elif num_files <= 100:
             rating = "optimal"
             status = "ok"
@@ -89,7 +98,7 @@ class SmallFileRule(Rule):
 
         elif files_per_gb > 2000 and num_files > 500:
             rating = "high_risk"
-            status = "warning" # Can be escalated to 'error' if strict
+            status = "warning"  # Could be escalated to 'error' if strict
             message = "Critical fragmentation detected (High file-to-size ratio)."
             recommendation = "Action: Run OPTIMIZE immediately to reduce query planning overhead."
 
