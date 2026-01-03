@@ -23,7 +23,7 @@ def run_orchestrator(
     config = config or {}
     available = discover_modules()
 
-    selected = modules or ["core"]
+    selected = modules or ["core_quality"]
     # Keep only modules that exist
     selected = [m for m in selected if m in available]
 

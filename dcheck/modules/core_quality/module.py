@@ -29,7 +29,7 @@ def _to_check_result(module_name: str, rule_result) -> CheckResult:
 class CoreModule(DCheckModule):
     @property
     def name(self) -> str:
-        return "core"
+        return "core_quality"
 
     @property
     def description(self) -> str:

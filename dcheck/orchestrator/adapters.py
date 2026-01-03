@@ -1,23 +1,31 @@
 # dcheck/orchestrator/adapters.py
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List
 
 from dcheck.common.types import Report as NewReport, CheckResult as NewCheckResult
 from dcheck.core.report import ValidationReport, RuleResult
 
 
+def _short_name(check_id: str) -> str:
+    """
+    Convert 'module.check' -> 'check'
+    If no dot, return as-is.
+    """
+    return check_id.split(".", 1)[1] if "." in check_id else check_id
+
+
 def report_to_validation_report(r: NewReport) -> ValidationReport:
     """
     Flatten module-isolated results into the existing ValidationReport
-    so render_report continues to work unchanged.
+    so render_report/tests continue to work.
     """
     flat: List[NewCheckResult] = r.all_results_flat()
 
-    # Determine rows from core.rowcount if present, else 0
+    # Determine rows from any '*.rowcount' pseudo-check
     rows = 0
     for cr in flat:
-        if cr.check_id == "core.rowcount":
+        if _short_name(cr.check_id) == "rowcount":
             try:
                 rows = int((cr.metrics or {}).get("rows", 0))
             except Exception:
@@ -32,21 +40,18 @@ def report_to_validation_report(r: NewReport) -> ValidationReport:
     )
 
     for cr in flat:
-        # Skip the pseudo-check from printing unless you want it visible
-        if cr.check_id == "core.rowcount":
+        # Hide rowcount pseudo-check from the old renderer/tests
+        if _short_name(cr.check_id) == "rowcount":
             continue
-
-        # Convert check_id back to old "name" used by renderer
-        # Example: "core.null_ratio" -> "null_ratio"
-        name = cr.check_id.split(".", 1)[1] if "." in cr.check_id else cr.check_id
 
         vr.results.append(
             RuleResult(
-                name=name,
+                name=_short_name(cr.check_id),
                 status=cr.status,
                 metrics=cr.metrics or {},
-                message=cr.message,
+                message=cr.message or "",
             )
         )
 
     return vr
+

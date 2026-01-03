@@ -91,7 +91,7 @@ def check(
     new_report = run_orchestrator(
         df,
         table_name=real_table_name,
-        modules=["core"],
+        modules=["core_quality"],
         config={"cache": cache},
         on_preflight_done=_on_preflight,
     )

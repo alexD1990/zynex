@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Dict
 
 from dcheck.common.interfaces import DCheckModule
-from dcheck.modules.core.module import CoreModule
+from dcheck.modules.core_quality.module import CoreModule
 
 
 def discover_modules() -> Dict[str, DCheckModule]:
