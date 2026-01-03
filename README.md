@@ -117,3 +117,12 @@ The output follows a few simple principles:
 - **Low noise** — only high-signal issues are surfaced
 
 The goal is to make data problems obvious while you are still working, not after a pipeline has failed.
+
+## Architecture note
+
+dcheck uses a modular internal architecture.
+The open-source distribution ships with a single built-in module
+(`core_quality`) that provides the checks described above.
+
+This design allows additional modules to be added in the future
+without changing the notebook API.
