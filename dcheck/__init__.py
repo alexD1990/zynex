@@ -1,3 +1,3 @@
-from .api import check
+from .api import check, dc
 
-__all__ = ["check"]
+__all__ = ["check", "dc"]
