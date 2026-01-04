@@ -1,5 +1,4 @@
-# dcheck/api.py
-from typing import Union, Optional
+from typing import Union, Optional, List, Dict, Any
 from pyspark.sql import DataFrame, SparkSession
 
 from dcheck.orchestrator.engine import run_orchestrator
@@ -12,14 +11,20 @@ def check(
     table_name: Optional[str] = None,
     render: bool = True,
     cache: bool = False,
+    modules: Optional[List[str]] = None,
+    config: Optional[Dict[str, Any]] = None,
 ):
     """
     Primary entry point for dcheck validation.
 
     Usage:
-      1. check("catalog.schema.table") -> Auto-loads table + runs metadata check.
-      2. check(df) -> Validates DataFrame (skips metadata check).
-      3. check(df, table_name="...") -> Validates DataFrame + runs metadata check.
+      1. check("catalog.schema.table") -> Auto-loads table + runs preflight if table_name is available.
+      2. check(df) -> Validates DataFrame.
+      3. check(df, table_name="...") -> Validates DataFrame + runs preflight.
+
+    Modules:
+      - Default: ["core_quality"]
+      - Enterprise: e.g. ["core_quality", "gdpr"] (requires plugin installed)
     """
 
     df: Optional[DataFrame] = None
@@ -70,10 +75,9 @@ def check(
         )
 
         # Adapt result shape to RuleResult expected by renderer
-        # "core.small_files" -> "small_files"
+        # "core_quality.small_files" -> "small_files"
         name = result.check_id.split(".", 1)[1] if "." in result.check_id else result.check_id
         mini_report.results.append(
-            # import locally to avoid circular import
             __import__("dcheck.core.report", fromlist=["RuleResult"]).RuleResult(
                 name=name,
                 status=result.status,
@@ -87,16 +91,23 @@ def check(
 
         print("Proceeding with full data scan...")
 
-    # 3) Execute Orchestrator
+    # 3) Prepare module selection + config
+    selected_modules = modules or ["core_quality"]
+
+    merged_config: Dict[str, Any] = dict(config or {})
+    # Keep existing explicit param behavior: cache argument wins
+    merged_config["cache"] = cache
+
+    # 4) Execute Orchestrator
     new_report = run_orchestrator(
         df,
         table_name=real_table_name,
-        modules=["core_quality"],
-        config={"cache": cache},
+        modules=selected_modules,
+        config=merged_config,
         on_preflight_done=_on_preflight,
     )
 
-    # 4) Render Final Report (keep existing renderer)
+    # 5) Render Final Report (keep existing renderer)
     old_report = report_to_validation_report(new_report)
 
     if render:
@@ -112,4 +123,3 @@ def check(
 
 # Short ergonomic alias for notebooks
 dc = check
-

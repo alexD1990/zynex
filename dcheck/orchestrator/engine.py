@@ -31,7 +31,8 @@ def run_orchestrator(
 
     # NOTE: rows will be computed by core module today (df.count()).
     # But we keep report.rows initialized with 0 and update later in adapter/rendering.
-    agg = ResultAggregator(rows=0, columns=len(df.columns), column_names=df.columns)
+    rows = df.count()
+    agg = ResultAggregator(rows=rows, columns=len(df.columns), column_names=df.columns)
 
     for module_name in selected:
         module = available[module_name]

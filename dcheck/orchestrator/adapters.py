@@ -22,14 +22,16 @@ def report_to_validation_report(r: NewReport) -> ValidationReport:
     """
     flat: List[NewCheckResult] = r.all_results_flat()
 
-    # Determine rows from any '*.rowcount' pseudo-check
-    rows = 0
+    # Prefer orchestrator-provided dataset metadata.
+    # Some legacy/core paths may emit a '*.rowcount' pseudo-check; keep that as an override if present.
+    rows = int(getattr(r, "rows", 0) or 0)
     for cr in flat:
         if _short_name(cr.check_id) == "rowcount":
             try:
                 rows = int((cr.metrics or {}).get("rows", 0))
             except Exception:
-                rows = 0
+                # Fall back to orchestrator-provided value if parsing fails
+                rows = int(getattr(r, "rows", 0) or 0)
             break
 
     vr = ValidationReport(
@@ -54,4 +56,5 @@ def report_to_validation_report(r: NewReport) -> ValidationReport:
         )
 
     return vr
+
 

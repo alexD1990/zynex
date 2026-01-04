@@ -94,6 +94,10 @@ def render_report(report: ValidationReport, verbose: bool = False, print_header:
         except Exception:
             return n
 
+    def _trim(s: str, n: int = 48) -> str:
+        s = str(s)
+        return s if len(s) <= n else s[: n - 1] + "…"
+
     # 1) SUMMARY HEADER
     if print_header:
         status_count = {"ok": 0, "warning": 0, "error": 0}
@@ -102,8 +106,16 @@ def render_report(report: ValidationReport, verbose: bool = False, print_header:
             if s in status_count:
                 status_count[s] += 1
 
-        err_str = f"{Colors.FAIL}{status_count['error']} Errors{Colors.ENDC}" if status_count["error"] > 0 else "0 Errors"
-        warn_str = f"{Colors.WARNING}{status_count['warning']} Warnings{Colors.ENDC}" if status_count["warning"] > 0 else "0 Warnings"
+        err_str = (
+            f"{Colors.FAIL}{status_count['error']} Errors{Colors.ENDC}"
+            if status_count["error"] > 0
+            else "0 Errors"
+        )
+        warn_str = (
+            f"{Colors.WARNING}{status_count['warning']} Warnings{Colors.ENDC}"
+            if status_count["warning"] > 0
+            else "0 Warnings"
+        )
         ok_str = f"{Colors.GREEN}{status_count['ok']} OK{Colors.ENDC}"
 
         print()
@@ -159,6 +171,40 @@ def render_report(report: ValidationReport, verbose: bool = False, print_header:
                     lines.append(f"      Range : {fmt(s.get('min'))} ... {fmt(s.get('max'))}")
                     lines.append(f"      Avg   : {fmt(s.get('avg'))} (std: {fmt(s.get('std'))})")
                     lines.append("")
+
+        elif result.name == "pii_scan":
+            flagged_cols = metrics.get("flagged_columns") or []
+            rows_scanned = metrics.get("rows_scanned")
+            cols_scanned = metrics.get("columns_scanned")
+            flagged_count = metrics.get("flagged_count")
+
+            lines.append(f"• Flagged columns : {', '.join(flagged_cols) if flagged_cols else '-'}")
+            if flagged_count is not None:
+                lines.append(f"• Flagged count   : {fmt(flagged_count)}")
+            if rows_scanned is not None:
+                lines.append(f"• Rows scanned    : {fmt(rows_scanned)}")
+            if cols_scanned is not None:
+                lines.append(f"• Cols scanned    : {fmt(cols_scanned)}")
+
+            masked = metrics.get("masked_samples") or {}
+            if masked:
+                lines.append("")
+                lines.append("• Findings (masked samples):")
+
+                for col, findings in masked.items():
+                    if not findings:
+                        continue
+
+                    parts: List[str] = []
+                    for f in findings:
+                        pii_type = f.get("pii_type", "?")
+                        match_count = f.get("match_count", 0)
+                        sample_list = f.get("sample") or []
+                        sample_list = [_trim(x) for x in sample_list[:3]]
+                        sample_txt = ", ".join(sample_list) if sample_list else "-"
+                        parts.append(f"{pii_type} ({match_count}) samples: {sample_txt}")
+
+                    lines.append(f"    - {Colors.BOLD}{col}{Colors.ENDC}: " + " | ".join(parts))
 
         elif result.name == "small_files":
             rating = (metrics.get("rating", "unknown") or "unknown").upper()
