@@ -208,3 +208,6 @@ __marimo__/
 
 
 debug_visual.py
+
+# Local AI / analysis docs (not tracked)
+docs_local/
