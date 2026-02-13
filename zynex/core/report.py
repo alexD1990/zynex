@@ -170,7 +170,8 @@ def render_report(report: ValidationReport, verbose: bool = False, print_header:
         elif result.name == "extreme_values":
             flagged = metrics.get("flagged_columns", {})
             if flagged:
-                lines.append("• Extreme deviations (>5 stddev):")
+                thr = metrics.get("threshold_stddev", 3.0)
+                lines.append(f"• Extreme deviations (>{thr} stddev):")
                 for c, s in flagged.items():
                     sigma = s.get("max_sigma", 0)
                     lines.append(f"    - {Colors.BOLD}{c}{Colors.ENDC} ({sigma}x sigma)")

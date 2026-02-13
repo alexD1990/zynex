@@ -107,6 +107,9 @@ class SkewnessRule(Rule):
         return RuleResult(
             name=self.name,
             status=status,
-            metrics={"flagged_columns": flagged_columns},
+            metrics={
+                "flagged_columns": flagged_columns,
+                "threshold_stddev": float(self.threshold),
+            },
             message=message,
         )

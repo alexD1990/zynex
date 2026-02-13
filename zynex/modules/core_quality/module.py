@@ -57,7 +57,7 @@ class CoreModule(DCheckModule):
 
         context = {"table_name": ctx.table_name, "rows": rows}
 
-        thr = float((ctx.config or {}).get("extreme_values_threshold_stddev", 5.0))
+        thr = float((ctx.config or {}).get("extreme_values_threshold_stddev", 3.0))
 
         rules = [
             DuplicateRowRule(),
