@@ -1,9 +1,9 @@
-# dcheck/orchestrator/aggregator.py
+# zynex/orchestrator/aggregator.py
 from __future__ import annotations
 
 from typing import List, Optional
 
-from dcheck.common.types import CheckResult, Report
+from zynex.common.types import CheckResult, Report
 
 
 class ResultAggregator:

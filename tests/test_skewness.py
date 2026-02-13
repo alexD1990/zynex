@@ -1,7 +1,7 @@
-from dcheck.rules.skewness import SkewnessRule
+from zynex.rules.skewness import SkewnessRule
 from pyspark.sql import SparkSession
 
-spark = SparkSession.builder.master("local").appName("dcheck-test").getOrCreate()
+spark = SparkSession.builder.master("local").appName("zynex-test").getOrCreate()
 
 def test_skewness_flags_extreme_value():
     # 100 normale verdier rundt 10, og én ekstrem verdi (1000)

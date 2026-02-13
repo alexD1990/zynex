@@ -4,14 +4,14 @@ import contextlib
 import pytest
 
 from pyspark.sql import SparkSession
-from dcheck.api import check
+from zynex.api import check
 
 
 @pytest.fixture(scope="session")
 def spark():
     spark = (
         SparkSession.builder.master("local[*]")
-        .appName("dcheck-test")
+        .appName("zynex-test")
         .getOrCreate()
     )
     yield spark

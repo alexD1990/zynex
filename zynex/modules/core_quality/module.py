@@ -1,15 +1,15 @@
-# dcheck/modules/core/module.py
+# zynex/modules/core/module.py
 from __future__ import annotations
 
 from typing import List
 
-from dcheck.common.interfaces import DCheckModule
-from dcheck.common.types import CheckResult, ExecutionContext
+from zynex.common.interfaces import DCheckModule
+from zynex.common.types import CheckResult, ExecutionContext
 
-from dcheck.rules.performance import SmallFileRule
-from dcheck.rules.structural import DuplicateRowRule
-from dcheck.rules.quality import NullRatioRule
-from dcheck.rules.skewness import SkewnessRule
+from zynex.rules.performance import SmallFileRule
+from zynex.rules.structural import DuplicateRowRule
+from zynex.rules.quality import NullRatioRule
+from zynex.rules.skewness import SkewnessRule
 
 
 def _to_check_result(module_name: str, rule_result) -> CheckResult:

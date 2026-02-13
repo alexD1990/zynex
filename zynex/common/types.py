@@ -1,4 +1,4 @@
-# dcheck/common/types.py
+# zynex/common/types.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field

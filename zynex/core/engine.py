@@ -1,11 +1,11 @@
-# dcheck/core/engine.py
+# zynex/core/engine.py
 from __future__ import annotations
 
 from typing import Optional, Callable
 
-from dcheck.orchestrator.engine import run_orchestrator
-from dcheck.orchestrator.adapters import report_to_validation_report
-from dcheck.core.report import ValidationReport, RuleResult
+from zynex.orchestrator.engine import run_orchestrator
+from zynex.orchestrator.adapters import report_to_validation_report
+from zynex.core.report import ValidationReport, RuleResult
 
 
 def run_engine(
