@@ -1,5 +1,5 @@
-from dcheck.rules.base import Rule
-from dcheck.core.report import RuleResult
+from zynex.rules.base import Rule
+from zynex.core.report import RuleResult
 
 class DuplicateRowRule(Rule):
     name = "duplicate_rows"

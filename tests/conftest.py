@@ -19,7 +19,7 @@ def spark() -> SparkSession:
 
     spark = (
         SparkSession.builder
-        .appName("dcheck-tests")
+        .appName("zynex-tests")
         .master("local[1]")
         .config("spark.ui.enabled", "false")
         .config("spark.sql.shuffle.partitions", "1")

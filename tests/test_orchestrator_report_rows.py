@@ -1,7 +1,7 @@
 from pyspark.sql import functions as F
 
 def test_modules_gdpr_only_preserves_dataset_rows_and_cols(spark):
-    from dcheck.api import dc
+    from zynex.api import dc
 
     df = spark.range(0, 10).withColumn("email", F.lit("test@example.com"))
 

@@ -1,10 +1,10 @@
-# dcheck/orchestrator/adapters.py
+# zynex/orchestrator/adapters.py
 from __future__ import annotations
 
 from typing import List
 
-from dcheck.common.types import Report as NewReport, CheckResult as NewCheckResult
-from dcheck.core.report import ValidationReport, RuleResult
+from zynex.common.types import Report as NewReport, CheckResult as NewCheckResult
+from zynex.core.report import ValidationReport, RuleResult
 
 
 _ALLOWED_STATUS = {"ok", "warning", "error", "skipped"}

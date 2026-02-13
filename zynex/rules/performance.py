@@ -3,8 +3,8 @@ from __future__ import annotations
 import re
 from typing import Optional, Dict, Any
 
-from dcheck.rules.base import Rule
-from dcheck.core.report import RuleResult
+from zynex.rules.base import Rule
+from zynex.core.report import RuleResult
 
 
 class SmallFileRule(Rule):

@@ -4,8 +4,8 @@ from typing import Optional, Dict, Any
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 
-from dcheck.rules.base import Rule
-from dcheck.core.report import RuleResult
+from zynex.rules.base import Rule
+from zynex.core.report import RuleResult
 
 
 class SkewnessRule(Rule):

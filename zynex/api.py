@@ -1,9 +1,9 @@
 from typing import Union, Optional, List, Dict, Any
 from pyspark.sql import DataFrame, SparkSession
 
-from dcheck.orchestrator.engine import run_orchestrator
-from dcheck.orchestrator.adapters import report_to_validation_report
-from dcheck.core.report import render_report, ValidationReport
+from zynex.orchestrator.engine import run_orchestrator
+from zynex.orchestrator.adapters import report_to_validation_report
+from zynex.core.report import render_report, ValidationReport
 
 
 def check(
@@ -15,7 +15,7 @@ def check(
     config: Optional[Dict[str, Any]] = None,
 ):
     """
-    Primary entry point for dcheck validation.
+    Primary entry point for zynex validation.
 
     Usage:
       1. check("catalog.schema.table") -> Auto-loads table + runs preflight if table_name is available.
@@ -78,7 +78,7 @@ def check(
         # "core_quality.small_files" -> "small_files"
         name = result.check_id.split(".", 1)[1] if "." in result.check_id else result.check_id
         mini_report.results.append(
-            __import__("dcheck.core.report", fromlist=["RuleResult"]).RuleResult(
+            __import__("zynex.core.report", fromlist=["RuleResult"]).RuleResult(
                 name=name,
                 status=result.status,
                 metrics=result.metrics or {},

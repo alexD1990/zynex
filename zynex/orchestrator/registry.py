@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Dict
 
-from dcheck.common.interfaces import DCheckModule
-from dcheck.modules.core_quality.module import CoreModule
+from zynex.common.interfaces import DCheckModule
+from zynex.modules.core_quality.module import CoreModule
 
 
 def _load_entrypoint_modules() -> Dict[str, DCheckModule]:
@@ -11,7 +11,7 @@ def _load_entrypoint_modules() -> Dict[str, DCheckModule]:
     Discover external modules via Python entry points.
 
     Expected entry point group:
-      [project.entry-points."dcheck.modules"]
+      [project.entry-points."zynex.modules"]
       gdpr = "dcheck_gdpr.module:GDPRModule"
     """
     modules: Dict[str, DCheckModule] = {}
@@ -26,9 +26,9 @@ def _load_entrypoint_modules() -> Dict[str, DCheckModule]:
         eps = entry_points()
 
         # Compatibility across Python versions:
-        # - New API: eps.select(group="dcheck.modules")
-        # - Old API: eps.get("dcheck.modules", [])
-        group = "dcheck.modules"
+        # - New API: eps.select(group="zynex.modules")
+        # - Old API: eps.get("zynex.modules", [])
+        group = "zynex.modules"
         if hasattr(eps, "select"):
             candidates = list(eps.select(group=group))
         else:

@@ -1,11 +1,11 @@
-# dcheck/orchestrator/engine.py
+# zynex/orchestrator/engine.py
 from __future__ import annotations
 
 from typing import Callable, List, Optional
 
-from dcheck.common.types import CheckResult, ExecutionContext, Report
-from dcheck.orchestrator.aggregator import ResultAggregator
-from dcheck.orchestrator.registry import discover_modules
+from zynex.common.types import CheckResult, ExecutionContext, Report
+from zynex.orchestrator.aggregator import ResultAggregator
+from zynex.orchestrator.registry import discover_modules
 
 
 def run_orchestrator(

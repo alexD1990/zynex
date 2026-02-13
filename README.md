@@ -1,13 +1,13 @@
-# dcheck
+# zynex
 
  **Fast, notebook-first data quality checks for Spark / Databricks**
 
-dcheck is a lightweight data-quality validation library for Apache Spark, designed specifically for Databricks notebooks.  
+zynex is a lightweight data-quality validation library for Apache Spark, designed specifically for Databricks notebooks.  
 It provides quick, readable checks for common data issues without requiring schemas, configuration files, or heavy setup.
 
-## What dcheck does
+## What zynex does
 
-dcheck focuses on a small set of high-signal checks that catch the most common data issues in analytical pipelines:
+zynex focuses on a small set of high-signal checks that catch the most common data issues in analytical pipelines:
 
 - **Structural issues** — duplicate full rows
 - **Data quality** — null ratios per column
@@ -18,11 +18,11 @@ The goal is not exhaustive validation, but fast feedback you can trust while wor
 
 ## Installation (Databricks)
 
-Install dcheck directly in your Databricks notebook:
+Install zynex directly in your Databricks notebook:
 > **Databricks note:** Install with `--no-deps` to avoid pip upgrading `pyspark` and breaking the runtime.
 
 ```bash
-%pip install --no-deps dcheck
+%pip install --no-deps zynex
 dbutils.library.restartPython()
 ```
 Installing from GitHub repo:
@@ -34,10 +34,10 @@ Restarting the Python kernel is required after installation.
 
 ## Quick start
 
-The simplest way to use dcheck is to validate a table by name:
+The simplest way to use zynex is to validate a table by name:
 
 ```python
-from dcheck.api import dc
+from zynex.api import dc
 
 dc("catalog.schema.table") 
 ```
@@ -69,7 +69,7 @@ Dataset: 5 033 rows x 10 columns | 0 Errors | 3 Warnings
 
 ## Usage patterns
 
-dcheck supports three explicit validation modes, depending on how your data is loaded.
+zynex supports three explicit validation modes, depending on how your data is loaded.
 
 ### 1. Validate a catalog table (recommended)
 
@@ -107,7 +107,7 @@ This is useful when the DataFrame is derived from a table, but you still want st
 
 ## Output philosophy
 
-dcheck is designed to be used interactively in notebooks, where fast feedback matters more than exhaustive reporting.
+zynex is designed to be used interactively in notebooks, where fast feedback matters more than exhaustive reporting.
 
 The output follows a few simple principles:
 
@@ -120,7 +120,7 @@ The goal is to make data problems obvious while you are still working, not after
 
 ## Architecture note
 
-dcheck uses a modular internal architecture.
+zynex uses a modular internal architecture.
 The open-source distribution ships with a single built-in module
 (`core_quality`) that provides the checks described above.
 

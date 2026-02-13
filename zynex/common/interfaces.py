@@ -1,10 +1,10 @@
-# dcheck/common/interfaces.py
+# zynex/common/interfaces.py
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
-from dcheck.common.types import CheckResult, ExecutionContext
+from zynex.common.types import CheckResult, ExecutionContext
 
 
 class DCheckModule(ABC):
