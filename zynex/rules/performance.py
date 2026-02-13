@@ -43,7 +43,7 @@ class SmallFileRule(Rule):
         if not self.table_name:
             return RuleResult(
                 name=self.name,
-                status="ok",
+                status="not_applicable",
                 metrics={
                     "rating": "not_applicable",
                     "reason": "no_table_name",
@@ -75,7 +75,7 @@ class SmallFileRule(Rule):
         except Exception as e:
             return RuleResult(
                 name=self.name,
-                status="ok",
+                status="not_applicable",
                 metrics={
                     "rating": "not_applicable",
                     "reason": "metadata_fetch_failed",
@@ -107,7 +107,7 @@ class SmallFileRule(Rule):
         # Small datasets (<256MB) are excluded from strict density checks.
         if total_size_mb < 256:
             rating = "not_applicable"
-            status = "ok"
+            status = "not_applicable"
             message = "Dataset is too small for file density analysis."
             recommendation = "No action required."
             files_per_gb = 0.0  # Reset for clarity in reports

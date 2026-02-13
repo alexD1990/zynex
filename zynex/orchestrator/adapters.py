@@ -7,7 +7,7 @@ from zynex.common.types import Report as NewReport, CheckResult as NewCheckResul
 from zynex.core.report import ValidationReport, RuleResult
 
 
-_ALLOWED_STATUS = {"ok", "warning", "error", "skipped"}
+_ALLOWED_STATUS = {"ok", "warning", "error", "skipped", "not_applicable"}
 
 
 def _short_name(check_id: str) -> str:

@@ -8,5 +8,6 @@ def test_small_files_skips_without_table_name():
     rule = SmallFileRule(table_name=None)
     res = rule.apply(df, context={"rows": 2, "table_name": None})
     
-    assert res.status.lower() == "ok"
     assert res.name == "small_files"
+    assert (res.status or "").lower() == "not_applicable"
+    assert (res.metrics or {}).get("rating") == "not_applicable"

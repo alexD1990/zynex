@@ -70,6 +70,9 @@ def render_report(report: ValidationReport, verbose: bool = False, print_header:
         elif status_l == "skipped":
             c = Colors.CYAN
             lbl = "[SKIPPED]"
+        elif status_l == "not_applicable":
+            c = Colors.CYAN
+            lbl = "[N/A]"
         else:
             c = Colors.GREEN
             lbl = "[OK]"
@@ -142,6 +145,9 @@ def render_report(report: ValidationReport, verbose: bool = False, print_header:
             continue
         if status == "skipped" and not verbose:
             print(f"{Colors.CYAN}[SKIPPED] {result.name}{Colors.ENDC}")
+            continue
+        if status == "not_applicable" and not verbose:
+            print(f"{Colors.CYAN}[N/A] {result.name}{Colors.ENDC}")
             continue
 
         lines: List[str] = []
