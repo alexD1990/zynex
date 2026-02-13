@@ -27,7 +27,7 @@ dbutils.library.restartPython()
 ```
 Installing from GitHub repo:
 ```python
-%pip install --no-deps --no-cache-dir git+https://github.com/alexD1990/DCheck.git@main
+%pip install --no-deps --no-cache-dir git+https://github.com/alexD1990/zynex.git@main
 dbutils.library.restartPython()
 ```
 Restarting the Python kernel is required after installation.
@@ -37,9 +37,9 @@ Restarting the Python kernel is required after installation.
 The simplest way to use zynex is to validate a table by name:
 
 ```python
-from zynex.api import dc
+from zynex.api import zx
 
-dc("catalog.schema.table") 
+zx("catalog.schema.table") 
 ```
 ## This will:
 
@@ -74,7 +74,7 @@ zynex supports three explicit validation modes, depending on how your data is lo
 ### 1. Validate a catalog table (recommended)
 
 ```python
-dc("workspace.default.my_table")
+zx("workspace.default.my_table")
 ```
 This is the primary and recommended usage:
 * Runs a pre-flight metadata check (small-file analysis)
@@ -85,7 +85,7 @@ Use this whenever the data exists as a Delta table in the catalog.
 
 ### 2. Validate a Spark DataFrame only
 ```python
-dc(df)
+zx(df)
 ```
 This mode:
 * Skips all metadata checks
@@ -96,7 +96,7 @@ Use this when working with intermediate DataFrames or derived results.
 
 ### 3. Validate a DataFrame with table context
 ```python
-dc(df, table_name="workspace.default.my_table")
+zx(df, table_name="workspace.default.my_table")
 ```
 This hybrid mode:
 * Uses the provided DataFrame for data scanning

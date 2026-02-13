@@ -122,4 +122,5 @@ def check(
 
 
 # Short ergonomic alias for notebooks
+zx = check
 dc = check
