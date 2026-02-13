@@ -1,4 +1,4 @@
-# zynex/modules/core/module.py
+# zynex/modules/core_quality/module.py
 from __future__ import annotations
 
 from typing import List
@@ -44,53 +44,31 @@ class CoreModule(DCheckModule):
             return None
 
         sf_rule = SmallFileRule(table_name=ctx.table_name)
-        # Existing rule expects context dict
         rule_res = sf_rule.apply(ctx.df, context={"table_name": ctx.table_name})
         return _to_check_result(self.name, rule_res)
 
     def run(self, ctx: ExecutionContext) -> List[CheckResult]:
         """
-        Full scan checks: count + duplicates + null ratio + skewness.
+        Full scan checks: duplicates + null ratio + skewness.
+        Rowcount is provided via ctx.rows (computed at most once for the whole run).
         """
         df = ctx.df
+        rows = ctx.rows
 
-        # Optional caching controlled by config
-        cache = bool(ctx.config.get("cache", False))
-        persisted = False
-        try:
-            if cache:
-                df = df.persist()
-                persisted = True
+        context = {"table_name": ctx.table_name, "rows": rows}
 
-            rows = int(df.count())
-            # Push rows into metrics so report adapter can set report.rows
-            # and downstream checks can use it.
-            context = {"table_name": ctx.table_name, "rows": rows}
+        thr = float((ctx.config or {}).get("extreme_values_threshold_stddev", 3.0))
 
-            rules = [
-                DuplicateRowRule(),
-                NullRatioRule(),
-                SkewnessRule(threshold_stddev=5.0),
-            ]
+        rules = [
+            DuplicateRowRule(),
+            NullRatioRule(),
+            SkewnessRule(threshold_stddev=thr),
+        ]
 
-            out: List[CheckResult] = []
-            # Put dataset rowcount as a pseudo-check so we can reconstruct report.rows later
-            out.append(
-                CheckResult(
-                    check_id=f"{self.name}.rowcount",
-                    status="ok",
-                    message=f"Rowcount computed: {rows}",
-                    metrics={"rows": rows},
-                    module_name=self.name,
-                )
-            )
+        out: List[CheckResult] = []
 
-            for rule in rules:
-                rule_res = rule.apply(df, context=context)
-                out.append(_to_check_result(self.name, rule_res))
+        for rule in rules:
+            rule_res = rule.apply(df, context=context)
+            out.append(_to_check_result(self.name, rule_res))
 
-            return out
-
-        finally:
-            if persisted:
-                df.unpersist()
+        return out

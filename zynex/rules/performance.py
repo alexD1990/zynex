@@ -1,10 +1,29 @@
 from __future__ import annotations
 
-import re
 from typing import Optional, Dict, Any
 
 from zynex.rules.base import Rule
 from zynex.core.report import RuleResult
+
+
+def _quote_ident(part: str) -> str:
+    # Spark SQL identifier quoting. Backticks inside identifiers are escaped as double backticks.
+    return f"`{part.replace('`', '``')}`"
+
+
+def _quote_table_name(name: str) -> str:
+    """
+    Supports Databricks / Spark identifiers:
+      - table
+      - schema.table
+      - catalog.schema.table (Unity Catalog)
+    """
+    parts = [p.strip() for p in name.split(".") if p.strip()]
+    if not (1 <= len(parts) <= 3):
+        raise ValueError(
+            f"Unsupported table name '{name}'. Expected table, schema.table, or catalog.schema.table."
+        )
+    return ".".join(_quote_ident(p) for p in parts)
 
 
 class SmallFileRule(Rule):
@@ -20,7 +39,7 @@ class SmallFileRule(Rule):
         self.table_name = table_name
 
     def apply(self, df, context: Optional[Dict[str, Any]] = None) -> RuleResult:
-        # 1. Skip if no table context is provided
+        # 1) Skip if no table context is provided
         if not self.table_name:
             return RuleResult(
                 name=self.name,
@@ -29,14 +48,15 @@ class SmallFileRule(Rule):
                     "rating": "not_applicable",
                     "reason": "no_table_name",
                     "target": "<not provided>",
-                    "recommendation": "Provide table_name/path to enable metadata-based file checks.",
+                    "recommendation": "Provide table_name to enable metadata-based file checks.",
                 },
-                message="No table_name/path provided. Cannot run file density analysis.",
+                message="No table_name provided. Cannot run file density analysis.",
             )
 
-        # 2. Input validation (SQL Injection guardrail)
-        # Accepts: schema.table OR catalog.schema.table
-        if not re.fullmatch(r"[A-Za-z0-9_]+(\.[A-Za-z0-9_]+){1,2}", self.table_name):
+        # 2) Build a safe, Databricks-friendly identifier (Unity Catalog compatible)
+        try:
+            quoted = _quote_table_name(self.table_name)
+        except Exception as e:
             return RuleResult(
                 name=self.name,
                 status="error",
@@ -44,16 +64,15 @@ class SmallFileRule(Rule):
                     "rating": "unknown",
                     "reason": "invalid_table_name",
                     "target": self.table_name,
-                    "recommendation": "Use 'schema.table' or 'catalog.schema.table'.",
+                    "recommendation": "Use table, schema.table, or catalog.schema.table (Unity Catalog).",
                 },
-                message="Invalid table name format. Expected 'schema.table' or 'catalog.schema.table'.",
+                message=f"Invalid table name: {type(e).__name__}: {e}",
             )
 
-        # 3. Fetch Metadata
+        # 3) Fetch metadata
         try:
-            detail = df.sparkSession.sql(f"DESCRIBE DETAIL {self.table_name}").collect()[0]
+            detail = df.sparkSession.sql(f"DESCRIBE DETAIL {quoted}").collect()[0]
         except Exception as e:
-            # ✅ Minimal fix for point 1-2: not applicable, include target/reason/recommendation, no fake 0 values
             return RuleResult(
                 name=self.name,
                 status="ok",
@@ -63,10 +82,13 @@ class SmallFileRule(Rule):
                     "target": self.table_name,
                     "recommendation": "Verify table exists and is Delta (try: DESCRIBE DETAIL <table>).",
                 },
-                message=f"Metadata fetch failed for '{self.table_name}' ({type(e).__name__}). Cannot run file density analysis.",
+                message=(
+                    f"Metadata fetch failed for '{self.table_name}' ({type(e).__name__}). "
+                    "Cannot run file density analysis."
+                ),
             )
 
-        # 4. Calculate Metrics
+        # 4) Calculate metrics
         num_files = int(detail["numFiles"])
         total_bytes = int(detail["sizeInBytes"])
 
@@ -81,7 +103,7 @@ class SmallFileRule(Rule):
         eps = 1e-9
         files_per_gb = (float(num_files) / max(total_size_gb, eps)) if num_files else 0.0
 
-        # 5. Evaluate Health (Heuristics)
+        # 5) Evaluate health (heuristics)
         # Small datasets (<256MB) are excluded from strict density checks.
         if total_size_mb < 256:
             rating = "not_applicable"
@@ -98,9 +120,9 @@ class SmallFileRule(Rule):
 
         elif files_per_gb > 2000 and num_files > 500:
             rating = "high_risk"
-            status = "warning"  # Could be escalated to 'error' if strict
+            status = "warning"
             message = "Critical fragmentation detected (High file-to-size ratio)."
-            recommendation = "Action: Run OPTIMIZE immediately to reduce query planning overhead."
+            recommendation = "Action: Run OPTIMIZE to reduce query planning overhead."
 
         elif files_per_gb > 200 or num_files > 1000 or avg_file_size_mb < 16:
             rating = "suboptimal"

@@ -1,11 +1,19 @@
 from zynex.rules.base import Rule
 from zynex.core.report import RuleResult
 
+
 class DuplicateRowRule(Rule):
     name = "duplicate_rows"
 
     def apply(self, df, context=None):
-        total_rows = int((context or {}).get("rows") or df.count())
+        ctx = context or {}
+
+        # Use provided rowcount (may legitimately be 0); only fall back to df.count() if missing.
+        if "rows" in ctx and ctx["rows"] is not None:
+            total_rows = int(ctx["rows"])
+        else:
+            total_rows = int(df.count())
+
         unique_rows = df.dropDuplicates().count()
         duplicate_rows = total_rows - unique_rows
 
