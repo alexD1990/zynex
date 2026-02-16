@@ -1,3 +1,4 @@
 from .api import check, zx, dc
 
-__all__ = ["check", "zx"]
+__version__ = "0.1.0"
+__all__ = ["check", "zx", "__version__"]
