@@ -49,7 +49,8 @@ def check(
             return None
 
         print(f"Loading table '{real_table_name}'...")
-                parts = [p.strip() for p in real_table_name.split(".") if p.strip()]
+
+        parts = [p.strip() for p in real_table_name.split(".") if p.strip()]
         if len(parts) == 2:
             schema, wanted = parts[0], parts[1]
             try:
