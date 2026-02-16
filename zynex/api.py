@@ -1,6 +1,7 @@
 from typing import Union, Optional, List, Dict, Any
 from pyspark.sql import DataFrame, SparkSession
 import difflib
+from pyspark.sql import functions as F
 
 from zynex.orchestrator.engine import run_orchestrator
 from zynex.orchestrator.adapters import report_to_validation_report
@@ -48,6 +49,28 @@ def check(
             return None
 
         print(f"Loading table '{real_table_name}'...")
+                parts = [p.strip() for p in real_table_name.split(".") if p.strip()]
+        if len(parts) == 2:
+            schema, wanted = parts[0], parts[1]
+            try:
+                existing = (
+                    spark.sql(f"SHOW TABLES IN {schema}")
+                        .filter(F.col("tableName") == wanted)
+                        .limit(1)
+                        .count()
+                )
+            except Exception:
+                existing = 1  # fallback: don't block load if SHOW TABLES fails
+
+            if existing == 0:
+                print(f"Error: Table not found: '{real_table_name}'")
+                suggestions = _suggest_table_names(spark, schema, wanted)
+                if suggestions:
+                    print("Did you mean:")
+                    for s in suggestions:
+                        print(f"  - {schema}.{s}")
+                print(f"Hint: try: SHOW TABLES IN {schema}")
+                return None
 
         try:
             df = spark.table(real_table_name)
