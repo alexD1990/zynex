@@ -230,3 +230,12 @@ Example metrics for null_ratio:
 * Spark 3.x
 * Databricks or compatible Spark environment
 * Delta tables for metadata preflight
+
+## Development
+```bash
+# Install in editable mode with dev dependencies
+pip install -e .[local,dev]
+
+# Run tests
+pytest
+```
