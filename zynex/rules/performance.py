@@ -105,35 +105,39 @@ class SmallFileRule(Rule):
 
         # 5) Evaluate health (heuristics)
         # Small datasets (<256MB) are excluded from strict density checks.
-        if total_size_mb < 256:
+        # Nothing to analyze
+        if num_files <= 0:
             rating = "not_applicable"
             status = "not_applicable"
-            message = "Dataset is too small for file density analysis."
-            recommendation = "No action required."
-            files_per_gb = 0.0  # Reset for clarity in reports
-
-        elif num_files <= 100:
-            rating = "optimal"
-            status = "ok"
-            message = "File density is optimal."
+            message = "No files found in table metadata."
             recommendation = "No action required."
 
-        elif files_per_gb > 2000 and num_files > 500:
+        # Truly tiny dev tables – avoid noise
+        elif total_size_mb < 32 and num_files < 50:
+            rating = "not_applicable"
+            status = "not_applicable"
+            message = "Dataset is tiny; file density signal is not meaningful."
+            recommendation = "No action required."
+
+        # High risk: many extremely small files
+        elif avg_file_size_mb < 1 and num_files >= 100:
             rating = "high_risk"
             status = "warning"
-            message = "Critical fragmentation detected (High file-to-size ratio)."
-            recommendation = "Action: Run OPTIMIZE to reduce query planning overhead."
+            message = "Critical fragmentation detected (many very small files)."
+            recommendation = "Action: Run OPTIMIZE or compact to reduce planning overhead."
 
-        elif files_per_gb > 200 or num_files > 1000 or avg_file_size_mb < 16:
+        # Suboptimal layout
+        elif avg_file_size_mb < 8 and num_files >= 50:
             rating = "suboptimal"
             status = "warning"
-            message = "File density is suboptimal; average file size is low."
-            recommendation = "Action: Monitor query performance. Consider OPTIMIZE if latency increases."
+            message = "File layout is suboptimal; average file size is low."
+            recommendation = "Consider OPTIMIZE/compaction if query latency increases."
 
+        # Healthy layout
         else:
             rating = "optimal"
             status = "ok"
-            message = "File layout is healthy."
+            message = "File layout looks healthy."
             recommendation = "No action required."
 
         return RuleResult(

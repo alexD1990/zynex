@@ -1,10 +1,19 @@
 from typing import Union, Optional, List, Dict, Any
 from pyspark.sql import DataFrame, SparkSession
+import difflib
+from pyspark.sql import functions as F
 
 from zynex.orchestrator.engine import run_orchestrator
 from zynex.orchestrator.adapters import report_to_validation_report
 from zynex.core.report import render_report, ValidationReport
 
+def _suggest_table_names(spark, schema: str, wanted: str, limit: int = 5) -> list[str]:
+    try:
+        rows = spark.sql(f"SHOW TABLES IN {schema}").select("tableName").collect()
+        names = [r["tableName"] for r in rows]
+        return difflib.get_close_matches(wanted, names, n=limit, cutoff=0.5)
+    except Exception:
+        return []
 
 def check(
     source: Union[str, DataFrame],
@@ -33,17 +42,63 @@ def check(
     # 1) Input Resolution
     if isinstance(source, str):
         real_table_name = source
-        try:
-            spark = SparkSession.getActiveSession()
-            if not spark:
-                print("Error: No active SparkSession found.")
+
+        spark = SparkSession.getActiveSession()
+        if not spark:
+            print("Error: No active SparkSession found.")
+            return None
+
+        print(f"Loading table '{real_table_name}'...")
+
+        parts = [p.strip() for p in real_table_name.split(".") if p.strip()]
+        if len(parts) == 2:
+            schema, wanted = parts[0], parts[1]
+            try:
+                existing = (
+                    spark.sql(f"SHOW TABLES IN {schema}")
+                        .filter(F.col("tableName") == wanted)
+                        .limit(1)
+                        .count()
+                )
+            except Exception:
+                existing = 1  # fallback: don't block load if SHOW TABLES fails
+
+            if existing == 0:
+                print(f"Error: Table not found: '{real_table_name}'")
+                suggestions = _suggest_table_names(spark, schema, wanted)
+                if suggestions:
+                    print("Did you mean:")
+                    for s in suggestions:
+                        print(f"  - {schema}.{s}")
+                print(f"Hint: try: SHOW TABLES IN {schema}")
                 return None
 
-            print(f"Loading table '{real_table_name}'...")
+        try:
             df = spark.table(real_table_name)
 
         except Exception as e:
-            print(f"Error: Could not load table '{real_table_name}': {e}")
+            msg = str(e)
+
+            # Common Spark error: TABLE_OR_VIEW_NOT_FOUND / cannot be found
+            if ("TABLE_OR_VIEW_NOT_FOUND" in msg) or ("cannot be found" in msg and "table or view" in msg.lower()):
+                print(f"Error: Table not found: '{real_table_name}'")
+
+                parts = [p.strip() for p in real_table_name.split(".") if p.strip()]
+                if len(parts) == 2:
+                    schema, wanted = parts[0], parts[1]
+                    suggestions = _suggest_table_names(spark, schema, wanted)
+                    if suggestions:
+                        print("Did you mean:")
+                        for s in suggestions:
+                            print(f"  - {schema}.{s}")
+                    print(f"Hint: try: SHOW TABLES IN {schema}")
+                else:
+                    print("Hint: try: SHOW TABLES (or qualify name as schema.table)")
+
+                return None
+
+            # Any other load error
+            print(f"Error: Could not load table '{real_table_name}': {type(e).__name__}: {e}")
             return None
 
     elif isinstance(source, DataFrame):
@@ -53,7 +108,6 @@ def check(
     else:
         raise ValueError("Input must be a Spark DataFrame or a table name string.")
 
-    # Track whether we already rendered the pre-flight small_files box
     preflight_ran = False
 
     # 2) Define Callback (Immediate UI Feedback)
@@ -69,8 +123,8 @@ def check(
         # Convert single CheckResult -> old ValidationReport for rendering
         mini_report = ValidationReport(
             rows=1,
-            columns=max(1, len(df.columns)),
-            column_names=df.columns,
+            columns=max(1, len(df.columns) if df is not None else 1),
+            column_names=(df.columns if df is not None else []),
             results=[],
         )
 

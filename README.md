@@ -16,113 +16,213 @@ zynex focuses on a small set of high-signal checks that catch the most common da
 
 The goal is not exhaustive validation, but fast feedback you can trust while working in notebooks.
 
-## Installation (Databricks)
-
-Install zynex directly in your Databricks notebook:
-> **Databricks note:** Install with `--no-deps` to avoid pip upgrading `pyspark` and breaking the runtime.
-
+## Installation 
 ```bash
-%pip install --no-deps zynex
-dbutils.library.restartPython()
+pip install zynex
 ```
-Installing from GitHub repo:
+## Quick Start
 ```python
-%pip install --no-deps --no-cache-dir git+https://github.com/alexD1990/zynex.git@main
-dbutils.library.restartPython()
+from zynex import zx
+
+zx("schema.table")
 ```
-Restarting the Python kernel is required after installation.
 
-## Quick start
-
-The simplest way to use zynex is to validate a table by name:
-
+## API
+### Primary entry point:
 ```python
-from zynex.api import zx
-
-zx("catalog.schema.table") 
+zx(
+    source,
+    table_name=None,
+    render=True,
+    cache=False,
+    modules=None,
+    config=None,
+)
 ```
-## This will:
 
-1. Run a pre-flight metadata check (small-file analysis, if a table name is provided)
-```
-[OK] small_files
-• Rating       : NOT_APPLICABLE
-• Num Files    : 5
-• Total Size   : 0.19 MB
-• Avg File Size: 0.04 MB
-```
-2. Run a full data scan
-```
-DCHECK REPORT
-Dataset: 5 033 rows x 10 columns | 0 Errors | 3 Warnings
-
-[WARNING] duplicate_rows
-• 30 duplicate rows (0.60%)
-
-[WARNING] null_ratio
-• 5 649 null values across 3 columns
-
-[WARNING] extreme_values
-• Extreme deviations detected in 5 columns
-```
-3. Render a clear validation report directly in the notebook
-
-## Usage patterns
-
-zynex supports three explicit validation modes, depending on how your data is loaded.
-
-### 1. Validate a catalog table (recommended)
-
+# Input Modes
+### 1 Validate a catalog table
 ```python
-zx("workspace.default.my_table")
+zx("schema.table")
 ```
-This is the primary and recommended usage:
-* Runs a pre-flight metadata check (small-file analysis)
-* Then performs a full data scan
-* Uses the table as the single source of truth
 
-Use this whenever the data exists as a Delta table in the catalog.
+### or with Unity Catalog:
+```python
+zx("catalog.schema.table")
+```
+### Behavior:
+* Loads table via spark.table(...)
+* Runs pre-flight metadata checks (if Delta)
+* Runs full data scan
 
-### 2. Validate a Spark DataFrame only
+### 2️ Validate a Spark DataFrame
 ```python
 zx(df)
 ```
-This mode:
-* Skips all metadata checks
-* Runs only data-level validation rules
-* Never inspects storage layout or files
+### Behavior:
+* Skips metadata preflight
+* Runs full data scan only
 
-Use this when working with intermediate DataFrames or derived results.
-
-### 3. Validate a DataFrame with table context
+### 3️ Validate DataFrame with table context
 ```python
-zx(df, table_name="workspace.default.my_table")
+zx(df, table_name="schema.table")
 ```
-This hybrid mode:
-* Uses the provided DataFrame for data scanning
-* Uses the table name for metadata checks
-* Avoids re-reading the table from storage
+Behavior:
+* Uses provided DataFrame
+* Uses table metadata for preflight checks
+* Avoids re-reading table
 
-This is useful when the DataFrame is derived from a table, but you still want storage-level diagnostics.
+# Optional Arguments
+### render
 
-## Output philosophy
+Default: ```True```
 
-zynex is designed to be used interactively in notebooks, where fast feedback matters more than exhaustive reporting.
+If ```False```, returns a ```ValidationReport``` object instead of printing.
+```python
+report = zx("schema.table", render=False)
+```
 
-The output follows a few simple principles:
+### cache
 
-- **Readable first** — results are optimized for humans, not machines
-- **Explicit results** — no silent failures or hidden warnings
-- **Safe by default** — metadata issues never block data scans
-- **Low noise** — only high-signal issues are surfaced
+Default: ```False```
 
-The goal is to make data problems obvious while you are still working, not after a pipeline has failed.
+If ```True```, DataFrame is persisted during validation.
+```python
+zx("schema.table", cache=True)
+```
+Recommended for large datasets.
 
-## Architecture note
+### modules
 
-zynex uses a modular internal architecture.
-The open-source distribution ships with a single built-in module
-(`core_quality`) that provides the checks described above.
+Default: ```["core_quality"]```
 
-This design allows additional modules to be added in the future
-without changing the notebook API.
+You can explicitly select modules:
+```python
+zx("schema.table", modules=["core_quality"])
+```
+
+### config
+
+Override rule configuration:
+```python
+zx(
+    "schema.table",
+    config={
+        "extreme_values_threshold_stddev": 2.0
+    }
+)
+```
+Currently supported config keys:
+* extreme_values_threshold_stddev (default: 3.0)
+* cache (internal, set via argument)
+
+# Output Structure
+
+Zynex prints:
+* Dataset summary (rows × columns)
+* Rule results grouped by:
+    * OK
+    * WARNING
+    * ERROR
+    * NOT_APPLICABLE
+
+Example:
+```yml
+ZYNEX REPORT
+Dataset: 240 000 rows x 10 columns | 0 Errors | 3 Warnings
+
+[WARNING] duplicate_rows
+[WARNING] null_ratio
+[WARNING] extreme_values
+```
+
+# Pre-Flight Behavior
+When validating a table:
+* Metadata checks run first (e.g., small_files)
+* Results are printed immediately
+* Validation continues regardless of warnings
+
+Zynex does not block execution.
+
+If fragmentation is detected:
+* Recommendation is shown
+* User decides whether to run OPTIMIZE
+
+# Table Name Errors
+If a table name is incorrect:
+```python
+zx("schema.wrong_name")
+```
+Zynex prints:
+* Clear error message
+* Suggested similar tables (if available)
+* Hint to use SHOW TABLES
+
+Validation stops early in this case.
+
+# Design Philosophy
+
+Zynex is:
+* Spark-native
+* Notebook-first
+* Advisory (not policy enforcement)
+* Lightweight and modular
+
+It is not:
+* A data governance framework
+* A pipeline orchestrator
+* A blocking validation gate
+
+# Return Value
+
+If render=```False```, returns:
+```yml
+ValidationReport
+```
+Containing:
+
+* row count
+* column count
+* rule results
+* metrics
+* messages
+
+## Inspecting the result programmatically
+```python
+print(report.rows)
+print(report.columns)
+```
+## Iterate over rule results
+```python
+for r in report.results:
+    print(r.name, r.status)
+```
+### Example:
+```python
+for r in report.results:
+    if r.name == "duplicate_rows":
+        print(r.metrics)
+```
+Example metrics for duplicate_rows:
+```python
+{
+    "duplicate_count": 40000,
+    "duplicate_ratio": 0.1667
+}
+```
+Example metrics for null_ratio:
+```python
+{
+    "total_nulls": 10764,
+    "columns_with_nulls": {
+        "amount": 7205,
+        "region": 2428,
+        "customer_id": 1131
+    }
+}
+```
+# Requirements
+
+* Spark 3.x
+* Databricks or compatible Spark environment
+* Delta tables for metadata preflight
