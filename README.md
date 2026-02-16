@@ -1,5 +1,9 @@
 # zynex
 
+[![PyPI version](https://badge.fury.io/py/zynex.svg)](https://badge.fury.io/py/zynex)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
  **Fast, notebook-first data quality checks for Spark / Databricks**
 
 zynex is a lightweight data-quality validation library for Apache Spark, designed specifically for Databricks notebooks.  
@@ -226,3 +230,12 @@ Example metrics for null_ratio:
 * Spark 3.x
 * Databricks or compatible Spark environment
 * Delta tables for metadata preflight
+
+## Development
+```bash
+# Install in editable mode with dev dependencies
+pip install -e .[local,dev]
+
+# Run tests
+pytest
+```

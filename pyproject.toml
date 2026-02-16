@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zynex"
+version = "0.1.0"
+description = "Fast, notebook-first data quality checks for Spark / Databricks"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Alexandro Dronnen", email = "alex12060309@gmail.com"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Quality Assurance",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+keywords = ["spark", "databricks", "data-quality", "validation", "pyspark"]
+
+dependencies = []
+
+[project.optional-dependencies]
+local = ["pyspark>=3.1"]
+dev = ["pytest>=6.0"]
+
+[project.urls]
+Homepage = "https://github.com/alexD1990/zynex"
+Repository = "https://github.com/alexD1990/zynex"
+Issues = "https://github.com/yourusername/zynex/issues"
+
+[tool.setuptools.packages.find]
+exclude = ["tests*", "docs_local*", "scripts*"]

@@ -211,3 +211,11 @@ debug_visual.py
 
 # Local AI / analysis docs (not tracked)
 docs_local/
+
+# PyPI distribution
+dist/
+build/
+*.egg-info/
+
+# PyPI credentials (NEVER commit this!)
+.pypirc
