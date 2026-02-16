@@ -84,6 +84,8 @@ def check(
     else:
         raise ValueError("Input must be a Spark DataFrame or a table name string.")
 
+    preflight_ran = False
+
     # 2) Define Callback (Immediate UI Feedback)
     def _on_preflight(result):
         nonlocal preflight_ran
@@ -97,8 +99,8 @@ def check(
         # Convert single CheckResult -> old ValidationReport for rendering
         mini_report = ValidationReport(
             rows=1,
-            columns=max(1, len(df.columns)),
-            column_names=df.columns,
+            columns=max(1, len(df.columns) if df is not None else 1),
+            column_names=(df.columns if df is not None else []),
             results=[],
         )
 
