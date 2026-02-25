@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Fast, notebook-first data quality checks for Spark / Databricks"
 readme = "README.md"
 requires-python = ">=3.8"
-license = {text = "Apache-2.0"}
+license = {file = "LICENSE"}
 authors = [
     {name = "Alexandro Dronnen", email = "alex12060309@gmail.com"}
 ]
@@ -35,7 +35,7 @@ dev = ["pytest>=6.0"]
 [project.urls]
 Homepage = "https://github.com/alexD1990/zynex"
 Repository = "https://github.com/alexD1990/zynex"
-Issues = "https://github.com/yourusername/zynex/issues"
+Issues = "https://github.com/alexD1990/zynex/issues"
 
 [tool.setuptools.packages.find]
 exclude = ["tests*", "docs_local*", "scripts*"]

@@ -67,16 +67,20 @@ def discover_modules() -> Dict[str, DCheckModule]:
     Step 1: built-in modules.
     Step 2: plugin discovery via entry points.
     """
-    builtins: Dict[str, DCheckModule] = {}
+    builtin_modules: Dict[str, DCheckModule] = {}
     core = CoreModule()
-    builtins[core.name] = core
+    builtin_modules[core.name] = core
 
     plugins = _load_entrypoint_modules()
 
-    # Avoid letting plugins shadow built-ins silently.
-    # Built-ins win if a plugin uses the same name.
     for name, mod in plugins.items():
-        if name not in builtins:
-            builtins[name] = mod
+        if name in builtin_modules:
+            warnings.warn(
+                f"Plugin '{name}' conflicts with a built-in module and will be ignored.",
+                UserWarning,
+                stacklevel=2,
+            )
+        else:
+            builtin_modules[name] = mod
 
-    return builtins
+    return builtin_modules
