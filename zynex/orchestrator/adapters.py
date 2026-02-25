@@ -17,11 +17,11 @@ def _short_name(check_id: str) -> str:
     """
     return check_id.split(".", 1)[1] if "." in check_id else check_id
 
-
 def _normalize_status(raw) -> str:
-    s = str(raw or "").strip().lower()
+    # str(CheckStatus.WARNING) gives "CheckStatus.WARNING" in Python 3.11+
+    # Use .value if available, otherwise fall back to str()
+    s = (raw.value if hasattr(raw, "value") else str(raw or "")).strip().lower()
     return s if s in _ALLOWED_STATUS else "error"
-
 
 def report_to_validation_report(r: NewReport) -> ValidationReport:
     """

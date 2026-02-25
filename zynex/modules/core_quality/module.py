@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import List
 
 from zynex.common.interfaces import DCheckModule
-from zynex.common.types import CheckResult, ExecutionContext
+from zynex.common.types import CheckResult, CheckStatus, ExecutionContext
 
 from zynex.rules.performance import SmallFileRule
 from zynex.rules.structural import DuplicateRowRule
@@ -13,19 +13,19 @@ from zynex.rules.skewness import SkewnessRule
 
 
 def _to_check_result(module_name: str, rule_result) -> CheckResult:
-    """
-    Adapter from existing RuleResult -> CheckResult.
-    rule_result has: name, status, metrics, message
-    """
+    raw = (rule_result.status or "").lower()
+    try:
+        status = CheckStatus(raw)
+    except ValueError:
+        status = CheckStatus.ERROR
     return CheckResult(
         check_id=f"{module_name}.{rule_result.name}",
-        status=(rule_result.status or "").lower(),
+        status=status,
         message=rule_result.message or "",
         metrics=rule_result.metrics or {},
         module_name=module_name,
     )
-
-
+    
 class CoreModule(DCheckModule):
     @property
     def name(self) -> str:

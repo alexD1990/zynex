@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Callable, List, Optional
 
-from zynex.common.types import CheckResult, ExecutionContext, Report
+from zynex.common.types import CheckResult, ExecutionContext, Report, CheckStatus
 from zynex.orchestrator.aggregator import ResultAggregator
 from zynex.orchestrator.registry import discover_modules
 
@@ -56,7 +56,7 @@ def run_orchestrator(
                     # Preflight failure should not stop full run
                     err = CheckResult(
                         check_id=f"{module_name}.preflight",
-                        status="error",
+                        status=CheckStatus.ERROR,
                         message=f"Preflight crashed: {type(e).__name__}: {e}",
                         metrics={},
                         module_name=module_name,
@@ -72,7 +72,7 @@ def run_orchestrator(
             except Exception as e:
                 err = CheckResult(
                     check_id=f"{module_name}.module_error",
-                    status="error",
+                    status=CheckStatus.ERROR,
                     message=f"Module crashed: {type(e).__name__}: {e}",
                     metrics={},
                     module_name=module_name,

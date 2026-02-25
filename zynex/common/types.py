@@ -99,7 +99,7 @@ class CheckStatus(str, Enum):
     WARNING = "warning"
     ERROR = "error"
     SKIPPED = "skipped"
-
+    NOT_APPLICABLE = "not_applicable"
 
 @dataclass
 class CheckResult:
@@ -107,7 +107,7 @@ class CheckResult:
     Standard result format across all modules.
     """
     check_id: str
-    status: str
+    status: CheckStatus
     message: str
     metrics: Dict[str, Any] = field(default_factory=dict)
     module_name: str = ""
