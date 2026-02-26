@@ -210,18 +210,19 @@ for r in report.results:
 Example metrics for duplicate_rows:
 ```python
 {
-    "duplicate_count": 40000,
-    "duplicate_ratio": 0.1667
+    "total_rows": 4.0,
+    "unique_rows": 3.0,
+    "duplicate_rows": 1.0
 }
 ```
 Example metrics for null_ratio:
 ```python
 {
-    "total_nulls": 10764,
-    "columns_with_nulls": {
-        "amount": 7205,
-        "region": 2428,
-        "customer_id": 1131
+    "total_nulls": 3,
+    "per_column": {
+        "name": {"nulls": 1},
+        "email": {"nulls": 1},
+        "age": {"nulls": 1}
     }
 }
 ```
