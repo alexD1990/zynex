@@ -49,6 +49,7 @@ def report_to_validation_report(r: NewReport) -> ValidationReport:
         columns=r.columns,
         column_names=r.column_names,
         results=[],
+        modules=list(r.results_by_module.keys()),
     )
 
     for cr in flat:
@@ -58,7 +59,7 @@ def report_to_validation_report(r: NewReport) -> ValidationReport:
 
         raw_status = cr.status
         status = _normalize_status(raw_status)
-        raw_norm = str(raw_status or "").strip().lower()
+        raw_norm = (raw_status.value if hasattr(raw_status, "value") else str(raw_status or "")).strip().lower()
 
         message = cr.message or ""
         # If module emits invalid status, make it visible + normalize to error.

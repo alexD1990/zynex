@@ -18,6 +18,7 @@ class ValidationReport:
     columns: int
     column_names: List[str]
     results: List[RuleResult] = field(default_factory=list)
+    modules: List[str] = field(default_factory=list)
 
     def has_warnings(self) -> bool:
         return any((r.status or "").lower() == "warning" for r in self.results)
